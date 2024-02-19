@@ -16,6 +16,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.awt.image.BufferedImage;
 import java.lang.reflect.Constructor;
+import java.util.concurrent.TimeUnit;
 
 import org.bukkit.Color;
 import org.bukkit.Bukkit;
@@ -26,10 +27,12 @@ import org.bukkit.util.Vector;
 import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.plugin.Plugin;
-import org.bukkit.scheduler.BukkitTask;
-import org.bukkit.scheduler.BukkitScheduler;
 import org.bukkit.configuration.MemoryConfiguration;
 import org.bukkit.configuration.ConfigurationSection;
+
+import io.papermc.paper.threadedregions.scheduler.ScheduledTask;
+import io.papermc.paper.threadedregions.scheduler.AsyncScheduler;
+import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 
 import com.google.common.base.CaseFormat;
 
@@ -47,7 +50,7 @@ public class EffectManager implements Disposable {
     private static final Map<String, Class<? extends Effect>> effectClasses = new HashMap<>();
     private Plugin owningPlugin;
     private Logger logger;
-    private Map<Effect, BukkitTask> effects;
+    private Map<Effect, ScheduledTask> effects;
     private ParticleDisplay display;
     private boolean disposed;
     private boolean disposeOnTermination;
@@ -57,6 +60,9 @@ public class EffectManager implements Disposable {
     private File imageCacheFolder;
     private Map<String, BufferedImage[]> imageCache;
     private final Set<UUID> ignoredPlayers = new HashSet<>();
+
+    private final AsyncScheduler asyncScheduler;
+    private final GlobalRegionScheduler globalRegionScheduler;
 
     public EffectManager(Plugin owningPlugin) {
         this(owningPlugin, owningPlugin.getLogger());
@@ -68,6 +74,9 @@ public class EffectManager implements Disposable {
         }
         this.owningPlugin = owningPlugin;
         this.logger = logger;
+
+        asyncScheduler = owningPlugin.getServer().getAsyncScheduler();
+        globalRegionScheduler = owningPlugin.getServer().getGlobalRegionScheduler();
 
         imageCacheFolder = new File(owningPlugin.getDataFolder(), "imagecache");
         imageCache = new HashMap<>();
@@ -170,7 +179,7 @@ public class EffectManager implements Disposable {
         Effect effect = null;
         try {
             Constructor<? extends Effect> constructor = effectLibClass.getConstructor(EffectManager.class);
-            effect = (Effect) constructor.newInstance(this);
+            effect = constructor.newInstance(this);
         } catch (Exception ex) {
             onError("Error loading EffectLib class: " + effectClass, ex);
         }
@@ -184,21 +193,28 @@ public class EffectManager implements Disposable {
         if (effects.containsKey(effect)) effect.cancel(false);
         if (!owningPlugin.isEnabled()) return;
 
-        BukkitScheduler s = Bukkit.getScheduler();
-        BukkitTask task = null;
+        ScheduledTask task = null;
+        int period = effect.getPeriod();
+        if (period <= 0) period = 1;
         switch (effect.getType()) {
-            case INSTANT:
-                if (effect.isAsynchronous()) task = s.runTaskAsynchronously(owningPlugin, effect);
-                else task = s.runTask(owningPlugin, effect);
-                break;
-            case DELAYED:
-                if (effect.isAsynchronous()) task = s.runTaskLaterAsynchronously(owningPlugin, effect, effect.getDelay());
-                else task = s.runTaskLater(owningPlugin, effect, effect.getDelay());
-                break;
-            case REPEATING:
-                if (effect.isAsynchronous()) task = s.runTaskTimerAsynchronously(owningPlugin, effect, effect.getDelay(), effect.getPeriod());
-                else task = s.runTaskTimer(owningPlugin, effect, effect.getDelay(), effect.getPeriod());
-                break;
+            case INSTANT -> {
+                if (effect.isAsynchronous())
+                    task = asyncScheduler.runNow(owningPlugin, scheduledTask -> effect.run());
+                else
+                    task = globalRegionScheduler.run(owningPlugin, scheduledTask -> effect.run());
+            }
+            case DELAYED -> {
+                if (effect.isAsynchronous())
+                    task = asyncScheduler.runDelayed(owningPlugin, scheduledTask -> effect.run(), (effect.getDelay() * 50L), TimeUnit.MILLISECONDS);
+                else
+                    task = globalRegionScheduler.runDelayed(owningPlugin, scheduledTask -> effect.run(), effect.getDelay());
+            }
+            case REPEATING -> {
+                if (effect.isAsynchronous())
+                    task = asyncScheduler.runAtFixedRate(owningPlugin, scheduledTask -> effect.run(), (effect.getDelay() * 50L), (period * 50L), TimeUnit.MILLISECONDS);
+                else
+                    task = globalRegionScheduler.runAtFixedRate(owningPlugin, scheduledTask -> effect.run(), effect.getDelay(), period);
+            }
         }
         synchronized (this) {
             effect.setStartTime(System.currentTimeMillis());
@@ -296,7 +312,7 @@ public class EffectManager implements Disposable {
     public void removeEffect(Effect effect) {
         synchronized (this) {
             if (effects == null) return;
-            BukkitTask existingTask = effects.get(effect);
+            ScheduledTask existingTask = effects.get(effect);
             if (existingTask != null) existingTask.cancel();
             effects.remove(effect);
         }
@@ -367,7 +383,7 @@ public class EffectManager implements Disposable {
         return logger;
     }
 
-    public Map<Effect, BukkitTask> getEffects() {
+    public Map<Effect, ScheduledTask> getEffects() {
         return effects;
     }
 
@@ -554,18 +570,11 @@ public class EffectManager implements Disposable {
             return;
         }
 
-        owningPlugin.getServer().getScheduler().runTaskAsynchronously(owningPlugin, new ImageLoadTask(this, fileName, new ImageLoadCallback() {
-            @Override
-            public void loaded(final BufferedImage[] images) {
-                 owningPlugin.getServer().getScheduler().runTask(owningPlugin, new Runnable() {
-                     @Override
-                     public void run() {
-                         imageCache.put(fileName, images);
-                         callback.loaded(images);
-                     }
-                 });
-            }
-        }));
+        owningPlugin.getServer().getScheduler().runTaskAsynchronously(owningPlugin,
+                new ImageLoadTask(this, fileName, images1 -> owningPlugin.getServer().getScheduler().runTask(owningPlugin, () -> {
+                    imageCache.put(fileName, images1);
+                    callback.loaded(images1);
+                })));
     }
 
     public void registerEffectClass(String key, Class<? extends Effect> effectClass) {

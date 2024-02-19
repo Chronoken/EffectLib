@@ -44,6 +44,7 @@ public enum ParticleUtil {
 	DAMAGE_INDICATOR("damage_indicator", "damageindicator"),
 	SWEEP_ATTACK("sweep_attack", "sweepattack"),
 	FALLING_DUST("falling_dust", "fallingdust"),
+	TOTEM("totem", "totem_of_undying"),
 	;
 
 	private static final Map<String, Particle> namesToType = new HashMap<>();

@@ -18,6 +18,7 @@ public class SoundEffect extends Effect {
         type = EffectType.REPEATING;
         period = 1;
         iterations = 1;
+        asynchronous = false;
     }
 
     @Override
