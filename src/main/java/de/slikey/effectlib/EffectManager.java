@@ -194,8 +194,12 @@ public class EffectManager implements Disposable {
         if (!owningPlugin.isEnabled()) return;
 
         ScheduledTask task = null;
+
         int period = effect.getPeriod();
+        int delay = effect.getDelay();
         if (period <= 0) period = 1;
+        if (delay <= 0) delay = 1;
+
         switch (effect.getType()) {
             case INSTANT -> {
                 if (effect.isAsynchronous())
@@ -207,13 +211,13 @@ public class EffectManager implements Disposable {
                 if (effect.isAsynchronous())
                     task = asyncScheduler.runDelayed(owningPlugin, scheduledTask -> effect.run(), (effect.getDelay() * 50L), TimeUnit.MILLISECONDS);
                 else
-                    task = globalRegionScheduler.runDelayed(owningPlugin, scheduledTask -> effect.run(), effect.getDelay());
+                    task = globalRegionScheduler.runDelayed(owningPlugin, scheduledTask -> effect.run(), delay);
             }
             case REPEATING -> {
                 if (effect.isAsynchronous())
                     task = asyncScheduler.runAtFixedRate(owningPlugin, scheduledTask -> effect.run(), (effect.getDelay() * 50L), (period * 50L), TimeUnit.MILLISECONDS);
                 else
-                    task = globalRegionScheduler.runAtFixedRate(owningPlugin, scheduledTask -> effect.run(), effect.getDelay(), period);
+                    task = globalRegionScheduler.runAtFixedRate(owningPlugin, scheduledTask -> effect.run(), delay, period);
             }
         }
         synchronized (this) {
