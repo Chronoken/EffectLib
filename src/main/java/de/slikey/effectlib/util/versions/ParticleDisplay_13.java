@@ -18,17 +18,17 @@ public class ParticleDisplay_13 extends ParticleDisplay {
     @Override
     public void display(Particle particle, ParticleOptions options, Location center, double range, List<Player> targetPlayers) {
         // Legacy colorizeable particles
-        if (options.color != null && (particle == Particle.SPELL_MOB || particle == Particle.SPELL_MOB_AMBIENT)) {
+        if (options.color != null && particle == Particle.ENTITY_EFFECT) {
             displayLegacyColored(particle, options, center, range, targetPlayers);
             return;
         }
 
-        if (particle == Particle.ITEM_CRACK) {
+        if (particle == Particle.ITEM) {
             displayItem(particle, options, center, range, targetPlayers);
             return;
         }
 
-        if (particle == Particle.BLOCK_CRACK || particle == Particle.BLOCK_DUST || particle == Particle.FALLING_DUST) {
+        if (particle == Particle.BLOCK || particle == Particle.FALLING_DUST) {
             Material material = options.material;
             if (material == null || material.name().contains("AIR")) return;
             try {
@@ -39,7 +39,7 @@ public class ParticleDisplay_13 extends ParticleDisplay {
             if (options.data == null) return;
         }
 
-        if (particle == Particle.REDSTONE) {
+        if (particle == Particle.DUST) {
             // color is required for 1.13
             if (options.color == null) options.color = Color.RED;
             options.data = new Particle.DustOptions(options.color, options.size);

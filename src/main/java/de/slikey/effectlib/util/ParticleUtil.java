@@ -1,97 +1,58 @@
 package de.slikey.effectlib.util;
 
-import java.util.Map;
-import java.util.HashMap;
-
 import org.bukkit.Particle;
+import org.bukkit.Registry;
+import org.bukkit.NamespacedKey;
 
-public enum ParticleUtil {
-
-	EXPLOSION_NORMAL("explosion_normal", "poof", "explode"),
-	EXPLOSION_LARGE("explosion_large", "explosion", "largeexplode"),
-	EXPLOSION_HUGE("explosion_huge", "explosion_emitter", "hugeexplosion"),
-	WATER_BUBBLE("water_bubble", "bubble"),
-	WATER_SPLASH("water_splash", "splash"),
-	WATER_WAKE("water_wake", "fishing", "wake"),
-	WATER_DROP("water_drop", "rain", "droplet"),
-	SPELL("spell", "effect"),
-	SPELL_INSTANT("spell_instant", "instant_effect", "instantspell"),
-	SPELL_MOB("spell_mob", "entity_effect", "mobspell"),
-	SPELL_MOB_AMBIENT("spell_mob_ambient", "ambient_entity_effect", "mobspellambient"),
-	SPELL_WITCH("spell_witch", "witch", "witchmagic"),
-	ITEM_CRACK("item_crack", "item", "iconcrack"),
-	BLOCK_CRACK("block_crack", "blockcrack"),
-	BLOCK_DUST("block_dust", "blockdust", "block"),
-	SMOKE_NORMAL("smoke_normal", "smoke"),
-	SMOKE_LARGE("smoke_large", "large_smoke", "largesmoke"),
-	DRIP_WATER("drip_water", "dripping_water", "dripwater"),
-	DRIP_LAVA("drip_lava", "dripping_lava", "driplava"),
-	VILLAGER_ANGRY("villager_angry", "angry_villager", "angryvillager"),
-	VILLAGER_HAPPY("villager_happy", "happy_villager", "happyvillager"),
-	FIREWORKS_SPARK("fireworks_spark", "firework", "fireworksspark"),
-	SUSPENDED("suspended", "underwater"),
-	SUSPENDED_DEPTH("suspended_depth", "depthsuspend"),
-	CRIT_MAGIC("crit_magic", "enchanted_hit", "magiccrit"),
-	TOWN_AURA("town_aura", "mycelium", "townaura"),
-	ENCHANTMENT_TABLE("enchantment_table", "enchant", "enchantmenttable"),
-	REDSTONE("redstone", "dust", "reddust"),
-	SNOWBALL("snowball", "item_snowball", "snowballpoof"),
-	SLIME("slime", "item_slime"),
-	MOB_APPEARANCE("mob_appearance", "elder_guardian", "mobappearance"),
-	SNOW_SHOVEL("snow_shovel", "snowshovel"),
-	DRAGON_BREATH("dragon_breath", "dragonbreath"),
-	END_ROD("end_rod", "endrod"),
-	DAMAGE_INDICATOR("damage_indicator", "damageindicator"),
-	SWEEP_ATTACK("sweep_attack", "sweepattack"),
-	FALLING_DUST("falling_dust", "fallingdust"),
-	TOTEM("totem", "totem_of_undying"),
-	;
-
-	private static final Map<String, Particle> namesToType = new HashMap<>();
-	private static boolean initialized = false;
-
-	private final String[] names;
-
-	ParticleUtil(String... names) {
-		this.names = names;
-	}
-
-	private static void initialize() {
-		if (initialized) return;
-
-		for (ParticleUtil p : ParticleUtil.values()) {
-			Particle particle = null;
-
-			try {
-				particle = Particle.valueOf(p.name());
-			} catch (Exception e) {
-				// ignored
-			}
-
-			if (particle == null) continue;
-
-			// handle the names
-			namesToType.put(p.name().toLowerCase(), particle);
-			for (String s : p.names) {
-				namesToType.put(s.toLowerCase(), particle);
-			}
-
-		}
-
-		initialized = true;
-	}
+public class ParticleUtil {
 
 	public static Particle getParticle(String particleName) {
-		initialize();
+		String lower = particleName.toLowerCase();
 
-		Particle particle = namesToType.get(particleName.toLowerCase());
-		if (particle != null) return particle;
+		return switch (lower) {
+			case "explode", "explosion_normal" -> Particle.POOF;
+			case "largeexplode", "explosion_large" -> Particle.EXPLOSION;
+			case "hugeexplosion", "explosion_huge" -> Particle.EXPLOSION_EMITTER;
+			case "fireworksspark", "fireworks_spark" -> Particle.FIREWORK;
+			case "water_bubble" -> Particle.BUBBLE;
+			case "water_splash" -> Particle.SPLASH;
+			case "wake", "water_wake" -> Particle.FISHING;
+			case "depthsuspend", "suspend", "suspended_depth" -> Particle.UNDERWATER;
+			case "magiccrit", "crit_magic" -> Particle.ENCHANTED_HIT;
+			case "smoke_normal" -> Particle.SMOKE;
+			case "largesmoke", "smoke_large" -> Particle.LARGE_SMOKE;
+			case "spell" -> Particle.EFFECT;
+			case "instantspell", "spell_instant" -> Particle.INSTANT_EFFECT;
+			case "mobspell", "mobspellambient", "spell_mob_ambient", "spell_mob" -> Particle.ENTITY_EFFECT;
+			case "witchmagic", "spell_witch" -> Particle.WITCH;
+			case "dripwater", "drip_water" -> Particle.DRIPPING_WATER;
+			case "driplava", "drip_lava" -> Particle.DRIPPING_LAVA;
+			case "angryvillager", "villager_angry" -> Particle.ANGRY_VILLAGER;
+			case "happyvillager", "villager_happy" -> Particle.HAPPY_VILLAGER;
+			case "townaura", "town_aura" -> Particle.MYCELIUM;
+			case "enchantmenttable", "enchantment_table" -> Particle.ENCHANT;
+			case "reddust", "redstone" -> Particle.DUST;
+			case "snowballpoof", "snowshovel", "snow_shovel", "snowball" -> Particle.ITEM_SNOWBALL;
+			case "slime" -> Particle.ITEM_SLIME;
+			case "iconcrack", "item_crack" -> Particle.ITEM;
+			case "blockcrack", "blockdust", "block_dust", "block_crack" -> Particle.BLOCK;
+			case "droplet", "water_drop" -> Particle.RAIN;
+			case "mobappearance", "mob_appearance" -> Particle.ELDER_GUARDIAN;
+			case "dragonbreath" -> Particle.DRAGON_BREATH;
+			case "endrod" -> Particle.END_ROD;
+			case "damageindicator" -> Particle.DAMAGE_INDICATOR;
+			case "sweepattack" -> Particle.SWEEP_ATTACK;
+			case "fallingdust" -> Particle.FALLING_DUST;
+			case "totem" -> Particle.TOTEM_OF_UNDYING;
+			default -> {
+				try {
+					yield Particle.valueOf(particleName.toUpperCase());
+				} catch (IllegalArgumentException ignored) {}
 
-		try {
-			particle = Particle.valueOf(particleName.toUpperCase());
-		} catch (IllegalArgumentException ignored) {}
-
-		return particle;
+				NamespacedKey key = NamespacedKey.fromString(lower);
+				yield key != null ? Registry.PARTICLE_TYPE.get(key) : null;
+			}
+		};
 	}
 
 }
