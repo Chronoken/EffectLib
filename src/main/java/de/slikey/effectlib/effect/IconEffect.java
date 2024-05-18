@@ -14,7 +14,7 @@ public class IconEffect extends Effect {
     public IconEffect(EffectManager effectManager) {
         super(effectManager);
         type = EffectType.REPEATING;
-        particle = Particle.VILLAGER_ANGRY;
+        particle = Particle.ANGRY_VILLAGER;
         period = 4;
         iterations = 25;
     }

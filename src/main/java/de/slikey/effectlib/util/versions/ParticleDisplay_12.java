@@ -19,17 +19,17 @@ public class ParticleDisplay_12 extends ParticleDisplay {
     public void display(Particle particle, ParticleOptions options, Location center, double range, List<Player> targetPlayers) {
         // Legacy colorizeable particles
         Color color = options.color;
-        if (color != null && (particle == Particle.REDSTONE || particle == Particle.SPELL_MOB || particle == Particle.SPELL_MOB_AMBIENT)) {
+        if (color != null && (particle == Particle.DUST || particle == Particle.ENTITY_EFFECT)) {
             displayLegacyColored(particle, options, center, range, targetPlayers);
             return;
         }
 
-        if (particle == Particle.ITEM_CRACK) {
+        if (particle == Particle.ITEM) {
             displayItem(particle, options, center, range, targetPlayers);
             return;
         }
 
-        if (particle == Particle.BLOCK_CRACK || particle == Particle.BLOCK_DUST || particle.name().equals("FALLING_DUST")) {
+        if (particle == Particle.BLOCK || particle.name().equals("FALLING_DUST")) {
             Material material = options.material;
             if (material == null || material.name().contains("AIR")) return;
             options.data = new MaterialData(material, options.materialData);

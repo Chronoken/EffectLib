@@ -109,7 +109,7 @@ public abstract class BaseImageEffect extends Effect {
     public BaseImageEffect(EffectManager effectManager) {
         super(effectManager);
         type = EffectType.REPEATING;
-        particle = Particle.REDSTONE;
+        particle = Particle.DUST;
         period = 2;
         iterations = 200;
     }
