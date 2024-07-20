@@ -1,2 +1,5 @@
 jdk:
   - openjdk21
+install:
+  - export MAVEN_OPTS=-Dmaven.version=3.9.8
+  - mvn install -DskipTests=true -Dmaven.version=3.9.8
