@@ -100,7 +100,7 @@ public class EffectManager implements Disposable {
     }
 
     private ParticleDisplay getDisplay() {
-        if (display == null) display = ParticleDisplay.newInstance();
+        if (display == null) display = new ParticleDisplay();
 
         display.setManager(this);
 
