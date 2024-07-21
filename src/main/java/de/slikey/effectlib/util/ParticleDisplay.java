@@ -19,7 +19,6 @@ public class ParticleDisplay {
 
     protected EffectManager manager;
 
-    private static boolean hasColorDataType = false;
     private static boolean hasColorTransition = false;
 
     protected void spawnParticle(Particle particle, ParticleOptions options, Location center, double range, List<Player> targetPlayers) {
@@ -46,7 +45,7 @@ public class ParticleDisplay {
     }
 
     private void playerDisplay(Particle particle, ParticleOptions options, Location center, Player player) {
-        if (hasColorDataType && particle == Particle.valueOf("ENTITY_EFFECT")) {
+        if (particle == Particle.valueOf("ENTITY_EFFECT")) {
             player.spawnParticle(particle, center, options.amount, options.offsetX, options.offsetY, options.offsetZ, options.speed, options.color);
         } else {
             player.spawnParticle(particle, center, options.amount, options.offsetX, options.offsetY, options.offsetZ, options.speed, options.data);
@@ -173,10 +172,6 @@ public class ParticleDisplay {
 
     public static boolean hasColorTransition() {
         return hasColorTransition;
-    }
-
-    public static boolean hasColorDataType() {
-        return hasColorDataType;
     }
 
 }
