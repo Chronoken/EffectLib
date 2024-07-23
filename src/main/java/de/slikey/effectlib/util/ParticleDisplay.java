@@ -19,7 +19,7 @@ public class ParticleDisplay {
 
     protected EffectManager manager;
 
-    private static boolean hasColorTransition = false;
+    private static boolean hasColorTransition = true;
 
     protected void spawnParticle(Particle particle, ParticleOptions options, Location center, double range, List<Player> targetPlayers) {
         try {
@@ -46,9 +46,9 @@ public class ParticleDisplay {
 
     private void playerDisplay(Particle particle, ParticleOptions options, Location center, Player player) {
         if (particle == Particle.valueOf("ENTITY_EFFECT")) {
-            player.spawnParticle(particle, center, options.amount, options.offsetX, options.offsetY, options.offsetZ, options.speed, options.color);
+            player.spawnParticle(particle, center, options.amount, options.offsetX, options.offsetY, options.offsetZ, options.speed, options.color, true);
         } else {
-            player.spawnParticle(particle, center, options.amount, options.offsetX, options.offsetY, options.offsetZ, options.speed, options.data);
+            player.spawnParticle(particle, center, options.amount, options.offsetX, options.offsetY, options.offsetZ, options.speed, options.data, true);
         }
 
         displayFakeBlock(player, center, options);
