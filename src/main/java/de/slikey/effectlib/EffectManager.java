@@ -260,6 +260,12 @@ public class EffectManager implements Disposable {
             setField(effect, key, parameters, parameterMap, logContext);
         }
 
+        //entity_effect particle requires a color to work, so lets set a default one
+        if (effect.getParticle() == Particle.ENTITY_EFFECT &&
+                effect.getColor() == null && effect.getColors() == null) {
+            effect.setColor(Color.BLACK);
+        }
+
         effect.initialize();
         if (origin != null) effect.setDynamicOrigin(origin);
         effect.setDynamicTarget(target);

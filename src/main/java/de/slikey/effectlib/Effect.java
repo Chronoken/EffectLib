@@ -107,6 +107,10 @@ public abstract class Effect implements Runnable {
         return color;
     }
 
+    public void setColor(Color color) {
+        this.color = color;
+    }
+
     public List<Color> getColorList() {
         return colorList;
     }
