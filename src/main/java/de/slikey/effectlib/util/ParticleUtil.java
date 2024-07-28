@@ -23,7 +23,8 @@ public class ParticleUtil {
 			case "largesmoke", "smoke_large" -> Particle.LARGE_SMOKE;
 			case "spell" -> Particle.EFFECT;
 			case "instantspell", "spell_instant" -> Particle.INSTANT_EFFECT;
-			case "mobspell", "mobspellambient", "spell_mob_ambient", "spell_mob" -> Particle.ENTITY_EFFECT;
+			case "mobspell", "mobspellambient", "spell_mob_ambient", "spell_mob",
+				 "ambient_entity_effect", "ambiententityeffect" -> Particle.ENTITY_EFFECT;
 			case "witchmagic", "spell_witch" -> Particle.WITCH;
 			case "dripwater", "drip_water" -> Particle.DRIPPING_WATER;
 			case "driplava", "drip_lava" -> Particle.DRIPPING_LAVA;
