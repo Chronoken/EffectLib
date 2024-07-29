@@ -3,10 +3,13 @@ package de.slikey.effectlib.util;
 import org.bukkit.Particle;
 import org.bukkit.Registry;
 import org.bukkit.NamespacedKey;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public class ParticleUtil {
 
-	public static Particle getParticle(String particleName) {
+	@Nullable
+	public static Particle getParticle(@NotNull String particleName) {
 		String lower = particleName.toLowerCase();
 
 		return switch (lower) {
@@ -45,15 +48,19 @@ public class ParticleUtil {
 			case "sweepattack" -> Particle.SWEEP_ATTACK;
 			case "fallingdust" -> Particle.FALLING_DUST;
 			case "totem" -> Particle.TOTEM_OF_UNDYING;
-			default -> {
-				try {
-					yield Particle.valueOf(particleName.toUpperCase());
-				} catch (IllegalArgumentException ignored) {}
-
-				NamespacedKey key = NamespacedKey.fromString(lower);
-				yield key != null ? Registry.PARTICLE_TYPE.get(key) : null;
-			}
+			case "gust_emitter" -> Particle.GUST_EMITTER_LARGE;
+			default -> getParticleFromString(lower);
 		};
+	}
+
+	@Nullable
+	private static Particle getParticleFromString(@NotNull String lowercaseParticleName) {
+		try {
+			return Particle.valueOf(lowercaseParticleName.toUpperCase());
+		} catch (IllegalArgumentException ignored) {
+			NamespacedKey key = NamespacedKey.fromString(lowercaseParticleName);
+			return key != null ? Registry.PARTICLE_TYPE.get(key) : null;
+		}
 	}
 
 }
