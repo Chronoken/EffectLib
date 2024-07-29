@@ -37,6 +37,8 @@ import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 import com.google.common.base.CaseFormat;
 
 import de.slikey.effectlib.util.*;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Dispose the EffectManager if you don't need it anymore.
@@ -257,7 +259,7 @@ public class EffectManager implements Disposable {
         for (String key : keys) {
             if (key.equals("class")) continue;
 
-            setField(effect, key, parameters, parameterMap, logContext);
+            if (!setField(effect, key, parameters, parameterMap, logContext)) return null;
         }
 
         //entity_effect particle requires a color to work, so lets set a default one
@@ -384,9 +386,8 @@ public class EffectManager implements Disposable {
     }
 
     public void onError(String message, Throwable ex) {
-        if (!debug) return;
-        if (stackTraces) getLogger().log(Level.WARNING, message, ex);
-        else getLogger().log(Level.WARNING, message);
+        if (stackTraces) getLogger().log(Level.SEVERE, message, ex);
+        else getLogger().log(Level.SEVERE, message);
     }
 
     public Logger getLogger() {
@@ -410,10 +411,11 @@ public class EffectManager implements Disposable {
     }
 
     public void onError(String message) {
-        if (debug) getLogger().log(Level.WARNING, message);
+        getLogger().log(Level.SEVERE, message);
     }
 
     protected boolean setField(Object effect, String key, ConfigurationSection section, ConfigurationSection parameterMap, String logContext) {
+        ConfigurationSection fieldSection = section;
         try {
             logContext = logContext == null ? "(?)" : logContext;
             String fieldKey = key;
@@ -428,7 +430,6 @@ public class EffectManager implements Disposable {
 
             if (key.contains("_")) key = CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, key);
 
-            ConfigurationSection fieldSection = section;
             if (parameterMap != null && stringValue.startsWith("$") && parameterMap.contains(stringValue)) {
                 fieldKey = stringValue;
                 fieldSection = parameterMap;
@@ -527,7 +528,9 @@ public class EffectManager implements Disposable {
                     if (!ParticleDisplay.hasColorTransition() && value.equalsIgnoreCase("DUST_COLOR_TRANSITION")) {
                         value = "REDSTONE";
                     }
-                    field.set(effect, ParticleUtil.getParticle(value));
+                    var particle = ParticleUtil.getParticle(value);
+                    if (particle == null) throw new IllegalStateException("Invalid particle type '" + value.toUpperCase() + "'");
+                    field.set(effect, particle);
                 }
             } else if (field.getType().isEnum()) {
                 Class<Enum> enumType = (Class<Enum>) field.getType();
@@ -544,16 +547,33 @@ public class EffectManager implements Disposable {
                 String value = fieldSection.getString(fieldKey);
                 field.set(effect, new CustomSound(value));
             } else {
-                onError("Unable to assign EffectLib property " + key + " of class " + effect.getClass().getSimpleName() + " in " + logContext);
+                logEffectLoadingError(key, effect.getClass(), fieldSection, logContext);
                 return false;
             }
 
             return true;
         } catch (Exception ex) {
-            onError("Error assigning EffectLib property: '" + key + "' of class: '" + effect.getClass().getSimpleName() + "' in: '" + logContext + "': " + ex.getMessage(), ex);
+            if (ex instanceof NoSuchFieldException) return true;
+            logEffectLoadingError(key, effect.getClass(), fieldSection, logContext, ex);
         }
-
         return false;
+    }
+
+    private void logEffectLoadingError(
+            @NotNull String key,
+            @NotNull Class<?> effectClass,
+            @NotNull ConfigurationSection section,
+            @NotNull String logContext) {
+        logEffectLoadingError(key, effectClass, section, logContext, null);
+    }
+
+    private void logEffectLoadingError(
+            @NotNull String key,
+            @NotNull Class<?> effectClass,
+            @NotNull ConfigurationSection section,
+            @NotNull String logContext,
+            @Nullable Throwable throwable) {
+        onError("Error assigning EffectLib property: '" + key + "' of class: '" + effectClass.getSimpleName() + "' in: '" + section.getCurrentPath() + "' (" + logContext + ")" + (throwable == null ? "" : ": " + throwable.getMessage()), throwable);
     }
 
     public static void disposeAll() {
