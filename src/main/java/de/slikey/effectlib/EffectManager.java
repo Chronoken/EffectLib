@@ -469,18 +469,23 @@ public class EffectManager implements Disposable {
             } else if (field.getType().equals(Color.class)) {
                 String value = fieldSection.getString(fieldKey);
                 if (value != null) {
-                    int hex;
+                    Color color;
                     if (value.equalsIgnoreCase("random")) {
                         byte alpha = (byte) (Math.random() * 255);
                         byte red = (byte) (Math.random() * 255);
                         byte green = (byte) (Math.random() * 255);
                         byte blue = (byte) (Math.random() * 255);
-                        hex = (alpha << 24) | (red << 16) | (green << 8) | blue;
+
+                        int hex = (alpha << 24) | (red << 16) | (green << 8) | blue;
+                        color = Color.fromARGB(hex);
                     } else {
                         if (value.startsWith("#")) value = value.substring(1);
-                        hex = Integer.parseUnsignedInt(value, 16);
+
+                        int hex = Integer.parseUnsignedInt(value, 16);
+                        color = value.length() > 6 ? Color.fromARGB(hex) : Color.fromRGB(hex);
                     }
-                    field.set(effect, value.length() > 6 ? Color.fromARGB(hex) : Color.fromRGB(hex));
+
+                    field.set(effect, color);
                 }
             } else if (Map.class.isAssignableFrom(field.getType()) && section.isConfigurationSection(key)) {
                 Map<String, Object> map = (Map<String, Object>) field.get(effect);
