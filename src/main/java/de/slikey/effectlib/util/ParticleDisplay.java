@@ -66,7 +66,9 @@ public class ParticleDisplay {
             return;
         }
 
-        if (particle == Particle.BLOCK || particle == Particle.FALLING_DUST) {
+        if (particle == Particle.BLOCK
+                || particle == Particle.FALLING_DUST
+                || particle == Particle.DUST_PILLAR) {
             Material material = options.material;
             if (material == null || material.name().contains("AIR")) return;
             try {
