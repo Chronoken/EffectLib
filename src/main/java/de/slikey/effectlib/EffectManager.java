@@ -21,7 +21,6 @@ import java.util.concurrent.TimeUnit;
 import org.bukkit.Color;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.Particle;
 import org.bukkit.util.Vector;
 import org.bukkit.entity.Entity;
@@ -90,11 +89,6 @@ public class EffectManager implements Disposable {
 
     public static List<EffectManager> getManagers() {
         return effectManagers;
-    }
-
-    public void display(Particle particle, Location center, float offsetX, float offsetY, float offsetZ, float speed, int amount, float size, Color color, Material material, byte materialData, double range, List<Player> targetPlayers) {
-        ParticleOptions options = new ParticleOptions(offsetX, offsetY, offsetZ, speed, amount, size, color, material, materialData);
-        getDisplay().display(particle, options, center, range, targetPlayers);
     }
 
     public void display(Particle particle, ParticleOptions options, Location center, double range, List<Player> targetPlayers) {
@@ -302,7 +296,7 @@ public class EffectManager implements Disposable {
         effect.start();
         return effect;
     }
-    
+
     public void cancel(boolean callback) {
         synchronized (this) {
             if (effects == null) return;
@@ -530,11 +524,7 @@ public class EffectManager implements Disposable {
             } else if (field.getType().equals(Particle.class)) {
                 String value = fieldSection.getString(fieldKey);
                 if (value != null) {
-                    // Legacy conversions
-                    if (!ParticleDisplay.hasColorTransition() && value.equalsIgnoreCase("DUST_COLOR_TRANSITION")) {
-                        value = "REDSTONE";
-                    }
-                    var particle = ParticleUtil.getParticle(value);
+                    Particle particle = ParticleUtil.getParticle(value);
                     if (particle == null) throw new IllegalStateException("Invalid particle type '" + value.toUpperCase() + "'");
                     field.set(effect, particle);
                 }

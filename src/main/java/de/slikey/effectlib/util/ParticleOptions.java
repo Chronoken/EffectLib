@@ -1,97 +1,103 @@
 package de.slikey.effectlib.util;
 
-import org.bukkit.Color;
-import org.bukkit.Material;
+import org.jetbrains.annotations.NotNull;
 
-public class ParticleOptions {
+import java.util.Objects;
 
-    public Color color;
-    public Color toColor;
+import org.bukkit.*;
+import org.bukkit.entity.Entity;
+import org.bukkit.inventory.ItemStack;
+import org.bukkit.block.data.BlockData;
+import org.bukkit.inventory.meta.Damageable;
 
-    public float offsetX;
-    public float offsetY;
-    public float offsetZ;
+public record ParticleOptions(
+        DynamicLocation target,
+        float offsetX,
+        float offsetY,
+        float offsetZ,
+        float speed,
+        int amount,
+        float size,
+        Color color,
+        Color toColor,
+        int arrivalTime,
+        Material material,
+        byte materialData,
+        String blockData,
+        long blockDuration,
+        int shriekDelay,
+        int trailDuration,
+        float sculkChargeRotation,
+        float dragonBreathPower,
+        float spellPower
+) {
 
-    public float speed;
-    public int amount;
-    public int arrivalTime;
-    public float size;
+    public Object resolve(@NotNull Particle particle) {
+        Class<?> type = particle.getDataType();
 
-    public Material material;
-    public byte materialData;
+        if (type == Color.class) {
+            return Objects.requireNonNullElse(this.color, Color.RED);
+        }
 
-    public String blockData;
-    public long blockDuration;
+        if (type == ItemStack.class) {
+            if (material == null || material.isAir()) return null;
 
-    public Object data;
+            ItemStack item = new ItemStack(material);
+            item.editMeta(Damageable.class, damageable -> damageable.setDamage(materialData));
+            return item;
+        }
 
-    public DynamicLocation target;
+        if (type == BlockData.class) {
+            if (material == null || material.isAir()) return null;
+            return material.createBlockData();
+        }
 
-    public int shriekDelay;
-    public float sculkChargeRotation;
+        if (type == Particle.DustOptions.class) {
+            Color color = Objects.requireNonNullElse(this.color, Color.RED);
+            return new Particle.DustOptions(color, size);
+        }
 
-    public ParticleOptions() {
+        if (type == Particle.DustTransition.class) {
+            Color color = Objects.requireNonNullElse(this.color, Color.RED);
+            Color toColor = Objects.requireNonNullElse(this.toColor, color);
+            return new Particle.DustTransition(color, toColor, size);
+        }
 
-    }
+        if (type == Vibration.class) {
+            if (target == null) return null;
 
-    public ParticleOptions(float offsetX, float offsetY, float offsetZ, float speed, int amount, float size, Color color, Material material, byte materialData) {
-        this.offsetX = offsetX;
-        this.offsetY = offsetY;
-        this.offsetZ = offsetZ;
-        this.speed = speed;
-        this.amount = amount;
-        this.size = size;
-        this.color = color;
-        this.material = material;
-        this.materialData = materialData;
-    }
+            Vibration.Destination destination;
+            Entity targetEntity = target.getEntity();
+            if (targetEntity != null) destination = new Vibration.Destination.EntityDestination(targetEntity);
+            else {
+                Location targetLocation = target.getLocation();
+                if (targetLocation == null) return null;
 
-    public ParticleOptions(float offsetX, float offsetY, float offsetZ, float speed, int amount, float size, Color color, Color toColor, int arrivalTime, Material material, byte materialData) {
-        this.offsetX = offsetX;
-        this.offsetY = offsetY;
-        this.offsetZ = offsetZ;
-        this.speed = speed;
-        this.amount = amount;
-        this.size = size;
-        this.color = color;
-        this.toColor = toColor;
-        this.material = material;
-        this.materialData = materialData;
-        this.arrivalTime = arrivalTime;
-    }
+                destination = new Vibration.Destination.BlockDestination(targetLocation);
+            }
 
-    public ParticleOptions(float offsetX, float offsetY, float offsetZ, float speed, int amount, float size, Color color, Color toColor, int arrivalTime, Material material, byte materialData, String blockData, long blockDuration) {
-        this.offsetX = offsetX;
-        this.offsetY = offsetY;
-        this.offsetZ = offsetZ;
-        this.speed = speed;
-        this.amount = amount;
-        this.size = size;
-        this.color = color;
-        this.toColor = toColor;
-        this.material = material;
-        this.materialData = materialData;
-        this.arrivalTime = arrivalTime;
-        this.blockData = blockData;
-        this.blockDuration = blockDuration;
-    }
+            return new Vibration(destination, arrivalTime);
+        }
 
-    public ParticleOptions(float offsetX, float offsetY, float offsetZ, float speed, int amount, float size, Color color, Color toColor, int arrivalTime, Material material, byte materialData, String blockData, long blockDuration, int shriekDelay, float sculkChargeRotation) {
-        this.offsetX = offsetX;
-        this.offsetY = offsetY;
-        this.offsetZ = offsetZ;
-        this.speed = speed;
-        this.amount = amount;
-        this.size = size;
-        this.color = color;
-        this.toColor = toColor;
-        this.material = material;
-        this.materialData = materialData;
-        this.arrivalTime = arrivalTime;
-        this.blockData = blockData;
-        this.blockDuration = blockDuration;
-        this.shriekDelay = shriekDelay;
-        this.sculkChargeRotation = sculkChargeRotation;
+        if (type == Particle.Trail.class) {
+            if (color == null) return null;
+            Location location = target == null ? null : target.getLocation();
+            if (location == null) return null;
+
+            return new Particle.Trail(location, color, trailDuration);
+        }
+
+        if (type == Particle.Spell.class) {
+            if (color == null) return null;
+            return new Particle.Spell(color, spellPower);
+        }
+
+        return switch (particle) {
+            case SHRIEK -> shriekDelay;
+            case SCULK_CHARGE -> sculkChargeRotation;
+            case DRAGON_BREATH -> dragonBreathPower;
+            default -> null;
+        };
     }
 
 }
