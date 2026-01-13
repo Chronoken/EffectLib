@@ -40,6 +40,9 @@ public abstract class Effect implements Runnable {
     public List<Color> toColorList = null;
     public String toColors = null;
     public int shriekDelay;
+    public int trailDuration;
+    public float spellPower;
+    public float dragonBreathPower;
     public float sculkChargeRotation;
     public int arrivalTime;
     public ConfigurationSection subEffect = null;
@@ -133,27 +136,6 @@ public abstract class Effect implements Runnable {
 
     public String getToColors() {
         return toColors;
-    }
-
-    /**
-     * Used only by the shriek particle in 1.19 and up.
-     */
-    public int getShriekDelay() {
-        return shriekDelay;
-    }
-
-    /**
-     * Used only by the sculk_charge particle in 1.19 and up.
-     */
-    public float getSculkChargeRotation() {
-        return sculkChargeRotation;
-    }
-
-    /**
-     * Used only by the vibration particle in 1.17 and up.
-     */
-    public int getArrivalTime() {
-        return arrivalTime;
     }
 
     /**
@@ -504,6 +486,7 @@ public abstract class Effect implements Runnable {
     /**
      * @deprecated Use {@link #setTarget(Location)}
      */
+    @Deprecated
     public void setTargetLocation(Location location) {
         target = new DynamicLocation(location);
     }
@@ -767,8 +750,27 @@ public abstract class Effect implements Runnable {
                 currentToColor = toColorList.get(ThreadLocalRandom.current().nextInt(colorList.size()));
             }
 
-            ParticleOptions options = new ParticleOptions(particleOffsetX, particleOffsetY, particleOffsetZ, speed, amount, particleSize, currentColor, currentToColor, arrivalTime, material, materialData, blockData, blockDuration, shriekDelay, sculkChargeRotation);
-            options.target = target;
+            ParticleOptions options = new ParticleOptions(
+                    target,
+                    particleOffsetX,
+                    particleOffsetY,
+                    particleOffsetZ,
+                    speed,
+                    amount,
+                    particleSize,
+                    currentColor,
+                    currentToColor,
+                    arrivalTime,
+                    material,
+                    materialData,
+                    blockData,
+                    blockDuration,
+                    shriekDelay,
+                    trailDuration,
+                    sculkChargeRotation,
+                    dragonBreathPower,
+                    spellPower
+            );
 
             effectManager.display(particle, options, location, visibleRange, targetPlayers);
         }
