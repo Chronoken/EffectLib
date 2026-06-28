@@ -3,6 +3,7 @@ package de.slikey.effectlib.effect;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.entity.Entity;
+import org.bukkit.entity.LivingEntity;
 
 import de.slikey.effectlib.Effect;
 import de.slikey.effectlib.EffectType;
@@ -47,7 +48,7 @@ public class BleedEffect extends Effect {
         location.getWorld().playEffect(location, org.bukkit.Effect.STEP_SOUND, material);
 
         Entity entity = getEntity();
-        if (hurt && entity != null) entity.playEffect(org.bukkit.EntityEffect.HURT);
+        if (hurt && entity instanceof LivingEntity le) le.playHurtAnimation(0);
     }
 
 }

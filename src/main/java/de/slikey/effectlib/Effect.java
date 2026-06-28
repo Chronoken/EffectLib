@@ -17,8 +17,8 @@ import de.slikey.effectlib.util.RandomUtils;
 import de.slikey.effectlib.util.DynamicLocation;
 import de.slikey.effectlib.util.ParticleOptions;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public abstract class Effect implements Runnable {
 
@@ -39,12 +39,14 @@ public abstract class Effect implements Runnable {
     public Color toColor = null;
     public List<Color> toColorList = null;
     public String toColors = null;
-    public int shriekDelay;
-    public int trailDuration;
-    public float spellPower;
-    public float dragonBreathPower;
-    public float sculkChargeRotation;
-    public int arrivalTime;
+    public Integer shriekDelay;
+    public Integer trailDuration;
+    public Float spellPower;
+    public Float dragonBreathPower;
+    public Float sculkChargeRotation;
+    public Integer geyserWaterBlocks;
+    public Float geyserBurstImpulse;
+    public Integer arrivalTime;
     public ConfigurationSection subEffect = null;
     public float speed = 0;
     public float particleData = 0;
@@ -88,7 +90,7 @@ public abstract class Effect implements Runnable {
      *
      * @see de.slikey.effectlib.EffectType
      */
-    @Nonnull
+    @NotNull
     public EffectType getType() {
         return type;
     }
@@ -769,7 +771,9 @@ public abstract class Effect implements Runnable {
                     trailDuration,
                     sculkChargeRotation,
                     dragonBreathPower,
-                    spellPower
+                    spellPower,
+                    geyserWaterBlocks,
+                    geyserBurstImpulse
             );
 
             effectManager.display(particle, options, location, visibleRange, targetPlayers);

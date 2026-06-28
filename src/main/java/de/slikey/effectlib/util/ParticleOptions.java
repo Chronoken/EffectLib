@@ -20,20 +20,36 @@ public record ParticleOptions(
         float size,
         Color color,
         Color toColor,
-        int arrivalTime,
+        Integer arrivalTime,
         Material material,
         byte materialData,
         String blockData,
         long blockDuration,
-        int shriekDelay,
-        int trailDuration,
-        float sculkChargeRotation,
-        float dragonBreathPower,
-        float spellPower
+        Integer shriekDelay,
+        Integer trailDuration,
+        Float sculkChargeRotation,
+        Float dragonBreathPower,
+        Float spellPower,
+        Integer geyserWaterBlocks,
+        Float geyserBurstImpulse
 ) {
 
     public Object resolve(@NotNull Particle particle) {
         Class<?> type = particle.getDataType();
+
+        try {
+            if (type == Particle.Geyser.class) {
+                if (geyserWaterBlocks == null) return null;
+                return new Particle.Geyser(geyserWaterBlocks);
+            }
+
+            if (type == Particle.GeyserBase.class) {
+                if (geyserWaterBlocks == null || geyserBurstImpulse == null) return null;
+                return new Particle.GeyserBase(geyserWaterBlocks, geyserBurstImpulse);
+            }
+        } catch (NoClassDefFoundError ignored) {
+            // This allows for minimal 26.1 support.
+        }
 
         if (type == Color.class) {
             return Objects.requireNonNullElse(this.color, Color.RED);
@@ -65,6 +81,7 @@ public record ParticleOptions(
 
         if (type == Vibration.class) {
             if (target == null) return null;
+            if (arrivalTime == null) return null;
 
             Vibration.Destination destination;
             Entity targetEntity = target.getEntity();
@@ -80,7 +97,7 @@ public record ParticleOptions(
         }
 
         if (type == Particle.Trail.class) {
-            if (color == null) return null;
+            if (color == null || trailDuration == null) return null;
             Location location = target == null ? null : target.getLocation();
             if (location == null) return null;
 
@@ -88,7 +105,7 @@ public record ParticleOptions(
         }
 
         if (type == Particle.Spell.class) {
-            if (color == null) return null;
+            if (color == null || spellPower == null) return null;
             return new Particle.Spell(color, spellPower);
         }
 
