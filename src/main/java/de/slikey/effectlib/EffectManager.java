@@ -1,22 +1,15 @@
 package de.slikey.effectlib;
 
+import java.util.*;
 import java.io.File;
-import java.util.Map;
-import java.util.Set;
 import java.awt.Font;
-import java.util.List;
-import java.util.UUID;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.lang.reflect.Field;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.awt.image.BufferedImage;
 import java.lang.reflect.Constructor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.bukkit.Color;
 import org.bukkit.Bukkit;
@@ -36,6 +29,7 @@ import io.papermc.paper.threadedregions.scheduler.GlobalRegionScheduler;
 import com.google.common.base.CaseFormat;
 
 import de.slikey.effectlib.util.*;
+
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -48,7 +42,12 @@ import org.jetbrains.annotations.Nullable;
 public class EffectManager implements Disposable {
 
     private static final List<EffectManager> effectManagers = new ArrayList<>();
-    private static final Map<String, Class<? extends Effect>> effectClasses = new HashMap<>();
+    private static final Map<String, Class<? extends Effect>> effectClasses = new ConcurrentHashMap<>();
+    private static final Map<Class<? extends Effect>, Constructor<? extends Effect>> constructorCache = new ConcurrentHashMap<>();
+
+    private static final Map<Class<?>, Map<String, FieldMeta>> fieldMetaCache = new ConcurrentHashMap<>();
+    private static final Map<String, String> normalizedKeyCache = new ConcurrentHashMap<>();
+
     private Plugin owningPlugin;
     private Logger logger;
     private Map<Effect, ScheduledTask> effects;
@@ -81,7 +80,7 @@ public class EffectManager implements Disposable {
 
         imageCacheFolder = new File(owningPlugin.getDataFolder(), "imagecache");
         imageCache = new HashMap<>();
-        effects = new HashMap<>();
+        effects = new ConcurrentHashMap<>();
         disposed = false;
         disposeOnTermination = false;
         effectManagers.add(this);
@@ -174,7 +173,11 @@ public class EffectManager implements Disposable {
 
         Effect effect = null;
         try {
-            Constructor<? extends Effect> constructor = effectLibClass.getConstructor(EffectManager.class);
+            Constructor<? extends Effect> constructor = constructorCache.get(effectLibClass);
+            if (constructor == null) {
+                constructor = effectLibClass.getConstructor(EffectManager.class);
+                constructorCache.put(effectLibClass, constructor);
+            }
             effect = constructor.newInstance(this);
         } catch (Exception ex) {
             onError("Error loading EffectLib class: " + effectClass, ex);
@@ -300,8 +303,7 @@ public class EffectManager implements Disposable {
     public void cancel(boolean callback) {
         synchronized (this) {
             if (effects == null) return;
-            List<Effect> allEffects = new ArrayList<>(effects.keySet());
-            for (Effect effect : allEffects) {
+            for (Effect effect : effects.keySet()) {
                 effect.cancel(callback);
             }
         }
@@ -408,149 +410,186 @@ public class EffectManager implements Disposable {
         getLogger().log(Level.SEVERE, message);
     }
 
-    protected boolean setField(Object effect, String key, ConfigurationSection section, ConfigurationSection parameterMap, String logContext) {
+    private static Map<String, FieldMeta> buildFieldMetaMap(Class<?> effectClass) {
+        Map<String, FieldMeta> map = new HashMap<>();
+        for (Field field : effectClass.getFields()) {
+            map.put(field.getName(), new FieldMeta(field, classifyField(field)));
+        }
+        return map;
+    }
+
+    private static ParameterType classifyField(Field field) {
+        Class<?> type = field.getType();
+        if (type == Integer.TYPE || type == Integer.class) return ParameterType.INT;
+        if (type == Float.TYPE || type == Float.class) return ParameterType.FLOAT;
+        if (type == Double.TYPE || type == Double.class) return ParameterType.DOUBLE;
+        if (type == Boolean.TYPE || type == Boolean.class) return ParameterType.BOOLEAN;
+        if (type == Long.TYPE || type == Long.class) return ParameterType.LONG;
+        if (type == Short.TYPE || type == Short.class) return ParameterType.SHORT;
+        if (type == Byte.TYPE || type == Byte.class) return ParameterType.BYTE;
+        if (type == String.class) return ParameterType.STRING;
+        if (type == Color.class) return ParameterType.COLOR;
+        if (type == Vector.class) return ParameterType.VECTOR;
+        if (type == Particle.class) return ParameterType.PARTICLE;
+        if (ConfigurationSection.class.isAssignableFrom(type)) return ParameterType.CONFIGURATION;
+        if (Map.class.isAssignableFrom(type)) return ParameterType.MAP;
+        if (type.isEnum()) return ParameterType.ENUM;
+        if (type == Font.class) return ParameterType.FONT;
+        if (type == CustomSound.class) return ParameterType.CUSTOM_SOUND;
+        return ParameterType.UNKNOWN;
+    }
+
+    private static String normalizeKey(String key) {
+        return normalizedKeyCache.computeIfAbsent(key, k -> {
+            if (k.indexOf('-') >= 0) k = k.replace('-', '_');
+            if (k.indexOf('_') >= 0) k = CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, k);
+            return k;
+        });
+    }
+
+    protected boolean setField(Object effect, String originalKey, ConfigurationSection section, ConfigurationSection parameterMap, String logContext) {
         ConfigurationSection fieldSection = section;
         try {
             logContext = logContext == null ? "(?)" : logContext;
-            String fieldKey = key;
-            String stringValue = section.getString(key);
+            String fieldKey = originalKey;
+            String stringValue = section.getString(originalKey);
             if (stringValue == null) {
-                onError("Null value for EffectLib property " + key + " of class " + effect.getClass().getSimpleName() + " in " + logContext);
+                onError("Null value for EffectLib property " + originalKey + " of class " + effect.getClass().getSimpleName() + " in " + logContext);
                 return false;
             }
 
-            // Allow underscore_style and dash_style parameters
-            if (key.contains("-")) key = key.replace("-", "_");
-
-            if (key.contains("_")) key = CaseFormat.LOWER_UNDERSCORE.to(CaseFormat.LOWER_CAMEL, key);
+            String normalizedKey = normalizeKey(originalKey);
 
             if (parameterMap != null && stringValue.startsWith("$") && parameterMap.contains(stringValue)) {
                 fieldKey = stringValue;
                 fieldSection = parameterMap;
             }
 
-            Field field = effect.getClass().getField(key);
+            FieldMeta meta = fieldMetaCache.computeIfAbsent(effect.getClass(), EffectManager::buildFieldMetaMap).get(normalizedKey);
+            if (meta == null) throw new NoSuchFieldException(normalizedKey);
+            Field field = meta.field();
 
-            if (field.getType().equals(Integer.TYPE) || field.getType().equals(Integer.class)) {
-                int intValue = Integer.MAX_VALUE;
-                if (!ConfigUtils.isMaxValue(stringValue)) intValue = fieldSection.getInt(fieldKey);
-                field.set(effect, intValue);
-            } else if (field.getType().equals(Float.TYPE) || field.getType().equals(Float.class)) {
-                float floatValue = Float.MAX_VALUE;
-                if (!ConfigUtils.isMaxValue(stringValue)) floatValue = (float) fieldSection.getDouble(fieldKey);
-                field.set(effect,floatValue);
-            } else if (field.getType().equals(Double.TYPE) || field.getType().equals(Double.class)) {
-                double doubleValue = Double.MAX_VALUE;
-                if (!ConfigUtils.isMaxValue(stringValue)) doubleValue = fieldSection.getDouble(fieldKey);
-                field.set(effect, doubleValue);
-            } else if (field.getType().equals(Boolean.TYPE) || field.getType().equals(Boolean.class)) {
-                field.set(effect, fieldSection.getBoolean(fieldKey));
-            } else if (field.getType().equals(Long.TYPE) || field.getType().equals(Long.class)) {
-                long longValue = Long.MAX_VALUE;
-                if (!ConfigUtils.isMaxValue(stringValue)) longValue = fieldSection.getLong(fieldKey);
-                field.set(effect, longValue);
-            } else if (field.getType().equals(Short.TYPE) || field.getType().equals(Short.class)) {
-                short shortValue = Short.MAX_VALUE;
-                if (!ConfigUtils.isMaxValue(stringValue)) shortValue = (short) fieldSection.getInt(fieldKey);
-                field.set(effect, shortValue);
-            } else if (field.getType().equals(Byte.TYPE) || field.getType().equals(Byte.class)) {
-                byte byteValue = Byte.MAX_VALUE;
-                if (!ConfigUtils.isMaxValue(stringValue)) byteValue = (byte) fieldSection.getInt(fieldKey);
-                field.set(effect, byteValue);
-            } else if (field.getType().equals(String.class)) {
-                String value = fieldSection.getString(fieldKey);
-                field.set(effect, value);
-            } else if (field.getType().equals(Color.class)) {
-                String value = fieldSection.getString(fieldKey);
-                if (value != null) {
-                    Color color;
-                    if (value.equalsIgnoreCase("random")) {
-                        byte alpha = (byte) (Math.random() * 255);
-                        byte red = (byte) (Math.random() * 255);
-                        byte green = (byte) (Math.random() * 255);
-                        byte blue = (byte) (Math.random() * 255);
-
-                        int hex = (alpha << 24) | (red << 16) | (green << 8) | blue;
-                        color = Color.fromARGB(hex);
-                    } else {
-                        if (value.startsWith("#")) value = value.substring(1);
-
-                        int hex = Integer.parseUnsignedInt(value, 16);
-                        color = value.length() > 6 ? Color.fromARGB(hex) : Color.fromRGB(hex);
-                    }
-
-                    field.set(effect, color);
+            switch (meta.type()) {
+                case INT -> {
+                    int intValue = Integer.MAX_VALUE;
+                    if (!ConfigUtils.isMaxValue(stringValue)) intValue = fieldSection.getInt(fieldKey);
+                    field.set(effect, intValue);
                 }
-            } else if (Map.class.isAssignableFrom(field.getType()) && section.isConfigurationSection(key)) {
-                Map<String, Object> map = (Map<String, Object>) field.get(effect);
-                ConfigurationSection subSection = section.getConfigurationSection(key);
-                if (subSection != null) {
-                    Set<String> keys = subSection.getKeys(false);
-                    for (String mapKey : keys) {
-                        map.put(mapKey, subSection.get(mapKey));
+                case FLOAT -> {
+                    float floatValue = Float.MAX_VALUE;
+                    if (!ConfigUtils.isMaxValue(stringValue)) floatValue = (float) fieldSection.getDouble(fieldKey);
+                    field.set(effect, floatValue);
+                }
+                case DOUBLE -> {
+                    double doubleValue = Double.MAX_VALUE;
+                    if (!ConfigUtils.isMaxValue(stringValue)) doubleValue = fieldSection.getDouble(fieldKey);
+                    field.set(effect, doubleValue);
+                }
+                case BOOLEAN -> field.set(effect, fieldSection.getBoolean(fieldKey));
+                case LONG -> {
+                    long longValue = Long.MAX_VALUE;
+                    if (!ConfigUtils.isMaxValue(stringValue)) longValue = fieldSection.getLong(fieldKey);
+                    field.set(effect, longValue);
+                }
+                case SHORT -> {
+                    short shortValue = Short.MAX_VALUE;
+                    if (!ConfigUtils.isMaxValue(stringValue)) shortValue = (short) fieldSection.getInt(fieldKey);
+                    field.set(effect, shortValue);
+                }
+                case BYTE -> {
+                    byte byteValue = Byte.MAX_VALUE;
+                    if (!ConfigUtils.isMaxValue(stringValue)) byteValue = (byte) fieldSection.getInt(fieldKey);
+                    field.set(effect, byteValue);
+                }
+                case STRING -> field.set(effect, fieldSection.getString(fieldKey));
+                case COLOR -> {
+                    String value = fieldSection.getString(fieldKey);
+                    if (value != null) {
+                        Color color;
+                        if (value.equalsIgnoreCase("random")) {
+                            byte alpha = (byte) (Math.random() * 255);
+                            byte red = (byte) (Math.random() * 255);
+                            byte green = (byte) (Math.random() * 255);
+                            byte blue = (byte) (Math.random() * 255);
+                            int hex = (alpha << 24) | (red << 16) | (green << 8) | blue;
+                            color = Color.fromARGB(hex);
+                        } else {
+                            if (value.startsWith("#")) value = value.substring(1);
+                            int hex = Integer.parseUnsignedInt(value, 16);
+                            color = value.length() > 6 ? Color.fromARGB(hex) : Color.fromRGB(hex);
+                        }
+                        field.set(effect, color);
                     }
                 }
-            } else if (Map.class.isAssignableFrom(field.getType()) && Map.class.isAssignableFrom(section.get(key).getClass())) {
-                field.set(effect, section.get(key));
-            } else if (ConfigurationSection.class.isAssignableFrom(field.getType())) {
-                ConfigurationSection configSection = ConfigUtils.getConfigurationSection(section, key);
-                if (parameterMap != null) {
-                    ConfigurationSection baseConfiguration = configSection;
-                    configSection = new MemoryConfiguration();
-                    if (baseConfiguration != null) {
-                        Set<String> keys = baseConfiguration.getKeys(false);
-                        // Note this doesn't handle sections within sections.
-                        for (String baseKey : keys) {
-                            Object baseValue = baseConfiguration.get(baseKey);
-                            if (baseValue instanceof String && ((String) baseValue).startsWith("$")) {
-                                // If this is an equation it will get parsed when needed
-                                String parameterValue = parameterMap.getString((String) baseValue);
-                                baseValue = parameterValue == null ? baseValue : parameterValue;
+                case MAP -> {
+                    if (section.isConfigurationSection(normalizedKey)) {
+                        Map<String, Object> map = (Map<String, Object>) field.get(effect);
+                        ConfigurationSection subSection = section.getConfigurationSection(normalizedKey);
+                        if (subSection != null) {
+                            Set<String> keys = subSection.getKeys(false);
+                            for (String mapKey : keys) {
+                                map.put(mapKey, subSection.get(mapKey));
                             }
-                            configSection.set(baseKey, baseValue);
+                        }
+                    } else {
+                        Object raw = section.get(normalizedKey);
+                        if (raw instanceof Map) field.set(effect, raw);
+                    }
+                }
+                case CONFIGURATION -> {
+                    ConfigurationSection configSection = ConfigUtils.getConfigurationSection(section, normalizedKey);
+                    if (parameterMap != null) {
+                        ConfigurationSection baseConfiguration = configSection;
+                        configSection = new MemoryConfiguration();
+                        if (baseConfiguration != null) {
+                            Set<String> keys = baseConfiguration.getKeys(false);
+                            for (String baseKey : keys) {
+                                Object baseValue = baseConfiguration.get(baseKey);
+                                if (baseValue instanceof String && ((String) baseValue).startsWith("$")) {
+                                    String parameterValue = parameterMap.getString((String) baseValue);
+                                    baseValue = parameterValue == null ? baseValue : parameterValue;
+                                }
+                                configSection.set(baseKey, baseValue);
+                            }
                         }
                     }
+                    field.set(effect, configSection);
                 }
-                field.set(effect, configSection);
-            } else if (field.getType().equals(Vector.class)) {
-                String value = fieldSection.getString(fieldKey);
-                if (value != null) {
-                    String[] pieces = value.split(",");
-                    double x = pieces.length > 0 ? Double.parseDouble(pieces[0]) : 0;
-                    double y = pieces.length > 1 ? Double.parseDouble(pieces[1]) : 0;
-                    double z = pieces.length > 2 ? Double.parseDouble(pieces[2]) : 0;
-                    field.set(effect, new Vector(x, y, z));
+                case VECTOR -> {
+                    String value = fieldSection.getString(fieldKey);
+                    if (value != null) {
+                        String[] pieces = value.split(",");
+                        double x = pieces.length > 0 ? Double.parseDouble(pieces[0]) : 0;
+                        double y = pieces.length > 1 ? Double.parseDouble(pieces[1]) : 0;
+                        double z = pieces.length > 2 ? Double.parseDouble(pieces[2]) : 0;
+                        field.set(effect, new Vector(x, y, z));
+                    }
                 }
-            } else if (field.getType().equals(Particle.class)) {
-                String value = fieldSection.getString(fieldKey);
-                if (value != null) {
-                    Particle particle = ParticleUtil.getParticle(value);
-                    if (particle == null) throw new IllegalStateException("Invalid particle type '" + value.toUpperCase() + "'");
-                    field.set(effect, particle);
+                case PARTICLE -> {
+                    String value = fieldSection.getString(fieldKey);
+                    if (value != null) {
+                        Particle particle = ParticleUtil.getParticle(value);
+                        if (particle == null) throw new IllegalStateException("Invalid particle type '" + value.toUpperCase() + "'");
+                        field.set(effect, particle);
+                    }
                 }
-            } else if (field.getType().isEnum()) {
-                Class<Enum> enumType = (Class<Enum>) field.getType();
-                String value = fieldSection.getString(fieldKey);
-                if (value != null) {
-                    field.set(effect, Enum.valueOf(enumType, value.toUpperCase()));
+                case ENUM -> {
+                    Class<Enum> enumType = (Class<Enum>) field.getType();
+                    String value = fieldSection.getString(fieldKey);
+                    if (value != null) field.set(effect, Enum.valueOf(enumType, value.toUpperCase()));
                 }
-            } else if (field.getType().equals(Font.class)) {
-                // Should caching the fonts be considered?
-                // Or is the performance gain negligible?
-                String value = fieldSection.getString(fieldKey);
-                field.set(effect, Font.decode(value));
-            } else if (field.getType().equals(CustomSound.class)) {
-                String value = fieldSection.getString(fieldKey);
-                field.set(effect, new CustomSound(value));
-            } else {
-                logEffectLoadingError(key, effect.getClass(), fieldSection, logContext);
-                return false;
+                case FONT -> field.set(effect, Font.decode(fieldSection.getString(fieldKey)));
+                case CUSTOM_SOUND -> field.set(effect, new CustomSound(fieldSection.getString(fieldKey)));
+                default -> {
+                    logEffectLoadingError(originalKey, effect.getClass(), fieldSection, logContext);
+                    return false;
+                }
             }
 
             return true;
         } catch (Exception ex) {
             if (ex instanceof NoSuchFieldException) return true;
-            logEffectLoadingError(key, effect.getClass(), fieldSection, logContext, ex);
+            logEffectLoadingError(originalKey, effect.getClass(), fieldSection, logContext, ex);
         }
         return false;
     }
@@ -633,4 +672,15 @@ public class EffectManager implements Disposable {
         }
         return visible;
     }
+
+    private record FieldMeta(Field field, ParameterType type) {
+
+    }
+
+    private enum ParameterType {
+        INT, FLOAT, DOUBLE, BOOLEAN, LONG, SHORT, BYTE,
+        STRING, COLOR, VECTOR, PARTICLE, ENUM,
+        CONFIGURATION, MAP, FONT, CUSTOM_SOUND, UNKNOWN
+    }
+
 }
