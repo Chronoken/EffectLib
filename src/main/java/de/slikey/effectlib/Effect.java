@@ -749,7 +749,7 @@ public abstract class Effect implements Runnable {
 
             Color currentToColor = toColor;
             if (toColorList != null && !toColorList.isEmpty()) {
-                currentToColor = toColorList.get(ThreadLocalRandom.current().nextInt(colorList.size()));
+                currentToColor = toColorList.get(ThreadLocalRandom.current().nextInt(toColorList.size()));
             }
 
             ParticleOptions options = new ParticleOptions(
