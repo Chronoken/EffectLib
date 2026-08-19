@@ -12,7 +12,7 @@
 
 	<organization>
 		<name>elMakers</name>
-		<url>http://www.elmakers.com/</url>
+		<url>https://www.elmakers.com/</url>
 	</organization>
 
 	<developers>
@@ -20,7 +20,7 @@
 			<name>Nathan Wolf</name>
 			<email>nathan@elmakers.com</email>
 			<organization>elMakers</organization>
-			<organizationUrl>http://www.elmakers.com</organizationUrl>
+			<organizationUrl>https://www.elmakers.com</organizationUrl>
 		</developer>
 		<developer>
 			<name>PikaMug</name>
@@ -36,7 +36,7 @@
 	<licenses>
 		<license>
 			<name>MIT License</name>
-			<url>http://opensource.org/licenses/mit-license</url>
+			<url>https://opensource.org/licenses/mit-license</url>
 		</license>
 	</licenses>
 
@@ -143,7 +143,7 @@
 				<configuration>
 					<additionalJOption>-Xdoclint:none</additionalJOption>
 				</configuration>
-				<version>3.10.1</version>
+				<version>3.12.0</version>
 				<executions>
 					<execution>
 						<phase>deploy</phase>
@@ -159,7 +159,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-source-plugin</artifactId>
-				<version>3.3.1</version>
+				<version>3.4.0</version>
 				<executions>
 					<execution>
 						<id>attach-sources</id>
@@ -174,7 +174,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-gpg-plugin</artifactId>
-				<version>3.2.3</version>
+				<version>3.2.8</version>
 				<executions>
 					<execution>
 						<id>sign-artifacts</id>
